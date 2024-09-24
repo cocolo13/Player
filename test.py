@@ -9,6 +9,7 @@ TEST_LEN = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 ]
 
+
 TEST_LAST = TEST_LEN
 
 TEST_REMOVE = [
@@ -243,7 +244,7 @@ class TestLinkedList(unittest.TestCase):
                 linked_list.insert(linked_list[index], data)
                 self.assertEqual(len(linked_list), len(node_list) + 1)
                 node_list.insert(index + 1, data)
-                self.assertEqual([i.data for i in linked_list], node_list)
+                self.assertEqual([i for i in linked_list], node_list)
 
     def test_getitem(self):
         """Тест индексации"""
