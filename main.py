@@ -1,168 +1,316 @@
-class LinkedListItem:
+import sys
 
-    def __init__(self, data=None, next=None, prev=None):
-        self.data = data
-        self.prev = prev
-        self.next = next
+from PyQt5 import uic
+import pygame
+from PyQt5.QtCore import QTimer
+from pygame import mixer
 
-    @property
-    def next_item(self):
-        return self.next
-
-    @next_item.setter
-    def next_item(self, value):
-        self.next = value
-        self.next.prev = self
-
-    @property
-    def previous_item(self):
-        return self.prev
-
-    @previous_item.setter
-    def previous_item(self, value):
-        self.prev = value
-        self.prev.next = self
+from Composition import Composition
+from playList import PlayList
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QMessageBox, \
+    QDialog, QTextEdit, QDialogButtonBox, QListWidget, QListWidgetItem, \
+    QLineEdit, QLabel
 
 
-class LinkedList:
-    def __init__(self, first_item=None):
-        self.first_item = first_item
-        self.last = self.create_last()
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.all_playlist = list()
+        self.current_playlist: None | PlayList = None
+        # Загружаем ui макет стартового окна и устанавливаем иконку приложения
+        uic.loadUi("window1.ui", self)
+        mixer.init()
 
-    def create_last(self):
-        if self.first_item is None:
-            return None
+        # Timer
+        self.pause = None
+        self.timer = QTimer()
+        self.remaining_time = 0
+        self.timer.timeout.connect(self.play_next_track)
+
+        self.title_track = self.findChild(QLabel, "titletrack")
+        ...
+
+        self.playlists_list = self.findChild(QListWidget, "listplaylist")
+        self.playlists_list.itemClicked.connect(self.set_current_playlist)
+
+        self.list_track = self.findChild(QListWidget, "listtrack")
+        self.list_track.itemClicked.connect(self.set_current_track)  ###
+
+        self.btn_add_playlist = self.findChild(QPushButton, "addplaylist")
+        self.btn_add_playlist.clicked.connect(self.create_playlist)
+
+        self.btn_del_playlist = self.findChild(QPushButton, "delplaylist")
+        self.btn_del_playlist.clicked.connect(self.delete_playlist)
+
+        self.btn_add_track = self.findChild(QPushButton, "addtrack")
+        self.btn_add_track.clicked.connect(self.add_track)
+
+        self.btn_del_track = self.findChild(QPushButton, "deltrack")
+        self.btn_del_track.clicked.connect(self.delete_track)
+
+        self.pause = self.findChild(QPushButton, "pause")
+        self.pause.clicked.connect(self.play)
+
+        self.next_track = self.findChild(QPushButton, "next")
+        self.next_track.clicked.connect(self.play_next_track)
+
+        self.previous_track = self.findChild(QPushButton, "back")
+        self.previous_track.clicked.connect(self.play_prev_track)
+
+    def create_playlist(self):
+        """Метод для создания нового плейлиста через диалоговое окно."""
+        dialog = Window2()
+        if dialog.exec_() == QDialog.Accepted:
+            playlist_title = dialog.playlist_title_edit.toPlainText().strip()
+            playlist_title = playlist_title.replace("\t", " ").replace("\n", " ")
+            if not all(p.title != playlist_title for p in self.all_playlist):
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Warning)
+                msg.setText("Ошибка")
+                msg.setInformativeText('Плейлист с таким названием уже существует')
+                msg.setWindowTitle("Ошибка")
+                msg.exec_()
+            if playlist_title:
+                self.all_playlist.append(PlayList(playlist_title))
+                self.playlists_list.addItem(playlist_title)
+            else:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Warning)
+                msg.setText("Ошибка")
+                msg.setInformativeText('Название не может быть пустым')
+                msg.setWindowTitle("Ошибка")
+                msg.exec_()
+
+    def set_current_playlist(self, playlist_title):
+        """обработка нажатия на плейлист (некоторый)"""
+        mixer.music.stop()
+        self.pause = None
+        self.timer.stop()
+        self.remaining_time = 0
+        for playlist in self.all_playlist:
+            if playlist.title == playlist_title.text():
+                if self.current_playlist:
+                    # self.title_track.setText("Title") # исправить, чтобыа менялось название плейлиста а не трека
+                    self.current_playlist.current_track = None
+                self.current_playlist = playlist
+                self.list_track.clear()
+                for track in self.current_playlist:
+                    self.list_track.addItem(QListWidgetItem(track.data.title))
+
+    def add_track(self):
+        # mixer.music.stop()
+        # self.pause = None
+        # self.timer.stop()
+        # self.remaining_time = 0
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText("Ошибка")
+        # msg.setInformativeText('Сначала необходимо создать плейлист')
+        msg.setWindowTitle("Ошибка")
+
+        if len(self.all_playlist) == 0:
+            msg.setInformativeText('Сначала необходимо создать плейлист')
+            msg.exec_()
+        elif self.current_playlist is None:
+            msg.setInformativeText('Выберите плейлист, в который хотите добавить трек')
+            msg.exec_()
         else:
-            last = self.first_item.prev
-            return last
+            window3 = Window3()
+            if window3.exec_() == QDialog.Accepted:
+                track_title = window3.track_title.toPlainText().strip()
+                # track_title = track_title.replace("\t", " ").replace("\n", " ")
+                track_path = window3.path.text()
+                if not track_path or not track_title.replace(" ", ""):
+                    msg.setInformativeText('Все поля должны быть заполнены')
+                    msg.exec_()
+                    return
+                for track in self.current_playlist:
+                    if track.data.title == track_title:
+                        msg.setInformativeText('Трек с таким названием уже есть в плейлисте')
+                        msg.exec_()
+                        return
+                try:
+                    track_length = mixer.Sound(track_path).get_length()
+                except (FileNotFoundError, pygame.error):
+                    msg.setInformativeText('Данные файл не поддерживается')
+                    msg.exec_()
+                    return
+                composition = Composition(title=track_title, path=track_path, length=track_length)
+                track_item = QListWidgetItem(f"{composition.title}")
+                self.current_playlist.append(composition)  # add iter!! in LinkedList
+                self.list_track.addItem(track_item)
 
-    def search_elem(self, elem):
-        if self.first_item is None:
-            return False
-        current = self.first_item
-        while current.next != self.first_item:
-            if current == elem:
-                return True
-            current = current.next
-        return current == elem
+    def set_current_track(self, track: QListWidgetItem):
+        mixer.music.stop()
+        self.pause = None
+        self.timer.stop()
+        self.remaining_time = 0
+        for t in self.current_playlist:
+            if t.data.title == track.text():
+                self.current_playlist.current_track = t
+                self.title_track.setText(t.data.title)
+                print("Data: ", self.current_playlist.current_track.next, self.current_playlist.current_track.data)
+                return
 
-    def append_right(self, item):
-        new_node = LinkedListItem(item)
-        if self.first_item is None:  # 0
-            self.first_item = new_node
-            self.first_item.next = new_node
-            self.first_item.prev = new_node
-            self.last = new_node
+    def play(self):
+        "Play current track"
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText("Ошибка")
+        # msg.setInformativeText('Сначала необходимо создать плейлист')
+        msg.setWindowTitle("Ошибка")
+        if len(self.all_playlist) == 0:
+            msg.setInformativeText('Список плейлистов пуст')
+            msg.exec_()
             return
-        if self.first_item == self.first_item.next:  # 1
-            self.last = new_node
-            self.last.prev = self.first_item
-            self.last.next = self.first_item
-            self.first_item.prev = self.last
-            self.first_item.next = self.last
+        if not self.current_playlist:
+            msg.setInformativeText('Текущий плейлист пуст')
+            msg.exec_()
             return
-        self.last.next = new_node
-        new_node.next = self.first_item
-        new_node.prev = self.last
-        self.first_item.prev = new_node
-        self.last = new_node
+        if not self.current_playlist.current_track:
+            msg.setInformativeText('Выберите трек из списка')
+            msg.exec_()
+            return
+        if (self.current_playlist is not None and
+                self.current_playlist.current_track is not None):
+            if self.pause is None:
+                self.current_playlist.play_all()
+                self.timer.start(int(self.current_playlist.current_track.data.length * 1000))
+                self.pause = False
+            elif self.pause:
+                mixer.music.unpause()
+                self.timer.start(self.remaining_time)
+                self.pause = False
+            else:
+                mixer.music.pause()
+                self.remaining_time = self.timer.remainingTime()
+                self.timer.stop()
+                self.pause = True
 
-    def append(self, item):
-        new_node = LinkedListItem(item)
-        if self.first_item is None:
-            self.first_item = new_node
-            self.first_item.next = new_node
-            self.first_item.prev = new_node
-            self.last = new_node
-            return
-        if self.first_item == self.first_item.next:
-            self.last = new_node
-            self.last.prev = self.first_item
-            self.last.next = self.first_item
-            self.first_item.prev = self.last
-            self.first_item.next = self.last
-            return
-        self.last.next = new_node
-        new_node.next = self.first_item
-        new_node.prev = self.last
-        self.first_item.prev = new_node
-        self.last = new_node
+    def play_next_track(self):
+        if ((self.current_playlist is not None) and
+                (self.current_playlist.current_track is not None)):
+            self.current_playlist.current_track = self.current_playlist.current_track.next
+            self.current_playlist.play_all()
+            self.timer.stop()
+            self.remaining_time = 0
+            self.timer.start(int(self.current_playlist.current_track.data.length * 1000))
+            self.pause = False
+            self.title_track.setText(self.current_playlist.current_track.data.title)
 
-    def append_left(self, item):
-        new_node = LinkedListItem(item)
-        if self.first_item is None:
-            self.first_item = new_node
-            self.last = new_node
-            self.first_item.next = new_node
-            self.first_item.prev = new_node
-            self.last.next = new_node
-            self.last.prev = new_node
-            return
-        if self.first_item.next == self.first_item:
-            new_node.next = self.last
-            new_node.prev = self.last
-            self.first_item = new_node
-            self.last.prev = new_node
-            self.last.next = new_node
-            return
-        self.last.next = new_node
-        self.first_item.prev = new_node
-        new_node.next = self.first_item
-        new_node.prev = self.last
-        self.first_item = new_node
+    def play_prev_track(self):
+        if ((self.current_playlist is not None) and
+                (self.current_playlist.current_track is not None)):
+            self.current_playlist.current_track = (
+                self.current_playlist.current_track.previous_item)
+            self.current_playlist.play_all()
+            self.timer.stop()
+            self.remaining_time = 0
+            self.timer.start(int(self.current_playlist.current_track.data.length * 1000))
+            self.pause = False
+            self.title_track.setText(self.current_playlist.current_track.data.title)
+            # self.author_label.setText(self.current_playlist.current_track.data.author)
 
-    def __contains__(self, item):
-        if self.first_item is None:
-            return False
-        current = self.first_item
-        if current.next == self.first_item:
-            return current.data == item
-        while current.next != self.first_item:
-            if current.data == item:
-                return True
-            current = current.next
-        return current.data == item
+    def delete_track(self):
+        """Function for delete track"""
+        mixer.music.stop()
+        self.pause = None
+        self.timer.stop()
+        self.remaining_time = 0
+        self.title_track.setText("")
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText("Ошибка")
+        if len(self.all_playlist) == 0:
+            msg.setInformativeText('К сожалению, Вам нечего удалять')
+            msg.exec_()
+            return
+        if self.current_playlist is None:
+            msg.setInformativeText('Пожалуйста, выберите плейлист')
+            msg.exec_()
+            return
+        if self.current_playlist.current_track is None and self.current_playlist is not None:
+            msg.setInformativeText('Пожалуйста, выберите трек, который хотите удалить')
+            msg.exec_()
+            return
+        if (self.current_playlist is not None
+                and self.current_playlist.current_track is not None):
+            track_item = self.list_track.selectedItems()[0]
+            self.list_track.takeItem(
+                self.list_track.row(track_item))
+            for i in self.current_playlist:
+                if i.data.title == track_item.text():
+                    self.current_playlist.remove(i.data)
+                    self.current_playlist.current_track = None
+                    return
 
-    def __getitem__(self, item):
-        length = self.__len__()
-        if item >= 0:
-            if length-1 < item or length == 0:
-                raise IndexError
-            i = 0
-            current = self.first_item
-            while i != item:
-                current = current.next
-                i += 1
+    def delete_playlist(self):
+        """Function for delete playlist"""
+        mixer.music.stop()
+        self.pause = None
+        self.timer.stop()
+        self.remaining_time = 0
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText("Ошибка")
+        if len(self.all_playlist) == 0:
+            msg.setInformativeText('К сожалению, Вам нечего удалять')
+            msg.exec_()
+            return
+        if self.current_playlist is None:
+            msg.setInformativeText('Пожалуста, выберите плейлист, который хотите удалить')
+            msg.exec_()
+            return
         else:
-            if -1 * length > item:
-                raise IndexError
-            current = self.first_item
-            i = -1 * length
-            while i != item:
-                current = current.prev
-                i += 1
-        return current.data
-
-    def insert(self, previous, item):
-        new_node = LinkedListItem(item)
-        current = self.first_item
-        while current.data != previous:
-            current = current.next
-        new_node.next = current.next
-        new_node.prev = current
-        current.next = new_node
-        new_node.next.prev = new_node
+            self.list_track.clear()
+            self.all_playlist.remove(self.current_playlist)
+            playlist_item = self.playlists_list.selectedItems()[0]
+            self.playlists_list.takeItem(self.playlists_list.row(playlist_item))
+            self.current_playlist = None
+            self.title_track.setText("")
 
 
-    def __len__(self):
-        if self.first_item is None:
-            return 0
-        current = self.first_item
-        length = 1
-        while current.next != self.first_item:
-            current = current.next
-            length += 1
-        return length
+class Window2(QDialog):
+    """Окно для создания плейлиста
+    Вводится название плейлиста и сохраняется
+    input"""
+
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("windo2.ui", self)
+        # Находим виджеты в загруженном интерфейсе
+        self.playlist_title_edit = self.findChild(QTextEdit, 'input_title')
+        self.buttons_box = self.findChild(QDialogButtonBox, 'buttonBox')
+
+        # Связываем кнопки с методами
+        self.buttons_box.accepted.connect(self.accept)  # Закрытие окна с подтверждением
+        self.buttons_box.rejected.connect(self.reject)  # Закрытие окна с отменой
 
 
+class Window3(QDialog):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi("window3.ui", self)
+        self.track_title = self.findChild(QTextEdit, "input_title")
+        self.path_btn = self.findChild(QPushButton, "btn")
+        self.buttons_box = self.findChild(QDialogButtonBox, "buttonBox")
+        self.path = self.findChild(QLineEdit, "lineEdit")
+        self.buttons_box.accepted.connect(self.accept)  # Закрытие окна с подтверждением
+        self.buttons_box.rejected.connect(self.reject)
 
+        self.path_btn.clicked.connect(self.select_file)
+
+    def select_file(self):
+        """Метод для открытия диалогового окна с выбором файла и последующим выбором"""
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "", "",
+                                                   "Audio Files (*.mp3)", options=options)
+        if file_name:
+            self.path.setText(file_name)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
