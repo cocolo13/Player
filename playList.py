@@ -1,5 +1,5 @@
-from back import LinkedList
-from Composition import Composition
+from back.LinkedList import LinkedList
+from back.Composition import Composition
 import pygame as pg
 
 pg.mixer.init()

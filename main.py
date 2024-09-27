@@ -5,11 +5,11 @@ import pygame
 from PyQt5.QtCore import QTimer
 from pygame import mixer
 
-from Composition import Composition
+from back.Composition import Composition
 from playList import PlayList
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QFileDialog, QMessageBox, \
     QDialog, QTextEdit, QDialogButtonBox, QListWidget, QListWidgetItem, \
-    QLineEdit, QLabel
+    QLineEdit, QLabel, QSpinBox
 
 
 class MainWindow(QMainWindow):
@@ -18,7 +18,7 @@ class MainWindow(QMainWindow):
         self.all_playlist = list()
         self.current_playlist: None | PlayList = None
         # Загружаем ui макет стартового окна и устанавливаем иконку приложения
-        uic.loadUi("window1.ui", self)
+        uic.loadUi("front/window1.ui", self)
         mixer.init()
 
         # Timer
@@ -56,6 +56,9 @@ class MainWindow(QMainWindow):
 
         self.previous_track = self.findChild(QPushButton, "back")
         self.previous_track.clicked.connect(self.play_prev_track)
+
+        self.btn_move = self.findChild(QPushButton, "move")
+        self.btn_move.clicked.connect(self.move_track)
 
     def create_playlist(self):
         """Метод для создания нового плейлиста через диалоговое окно."""
@@ -149,7 +152,6 @@ class MainWindow(QMainWindow):
             if t.data.title == track.text():
                 self.current_playlist.current_track = t
                 self.title_track.setText(t.data.title)
-                print("Data: ", self.current_playlist.current_track.next, self.current_playlist.current_track.data)
                 return
 
     def play(self):
@@ -269,6 +271,55 @@ class MainWindow(QMainWindow):
             self.current_playlist = None
             self.title_track.setText("")
 
+    def move_track(self):
+        mixer.music.stop()
+        self.music_paused = None
+        self.timer.stop()
+        self.remaining_time = 0
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setText("Ошибка")
+        if len(self.all_playlist) == 0:
+            msg.setInformativeText('Сначала необходимо создать плейлист')
+            msg.exec_()
+            return
+        if self.current_playlist is None:
+            msg.setInformativeText('Пожалуста, выберите плейлист')
+            msg.exec_()
+            return
+        if len(self.current_playlist) < 2:
+            msg.setInformativeText('В плейлисте должно быть минимум два трека')
+            msg.exec_()
+            return
+        window4 = Window4()
+        window4.f_index.setMaximum(len(self.current_playlist))
+        window4.s_index.setMaximum(len(self.current_playlist))
+        if window4.exec_() == QDialog.Accepted:
+            first = window4.f_index.value() - 1
+            second = window4.s_index.value() - 1
+            if first == second:
+                msg.setInformativeText('Пожалуста, выберите два разных индекса')
+                msg.exec_()
+                return
+            remove = self.current_playlist[first]
+            if second == len(self.current_playlist)-1 and first == 0:
+                ins = self.current_playlist[second]
+                self.current_playlist.remove(self.current_playlist[second])
+                self.current_playlist.append_left(ins)
+            elif second == -1:
+                self.current_playlist.remove(remove)
+                self.current_playlist.append_left(remove)
+            else:
+                prev = self.current_playlist[second]
+                self.current_playlist.remove(remove)
+                self.current_playlist.insert(prev, remove)
+            self.list_track.clear()
+            for track in self.current_playlist:
+                self.list_track.addItem(QListWidgetItem(track.data.title))
+            self.current_playlist.current_track = None
+            self.title_track.setText("")
+        return
+
 
 class Window2(QDialog):
     """Окно для создания плейлиста
@@ -277,7 +328,7 @@ class Window2(QDialog):
 
     def __init__(self):
         super().__init__()
-        uic.loadUi("windo2.ui", self)
+        uic.loadUi("front/window2.ui", self)
         # Находим виджеты в загруженном интерфейсе
         self.playlist_title_edit = self.findChild(QTextEdit, 'input_title')
         self.buttons_box = self.findChild(QDialogButtonBox, 'buttonBox')
@@ -290,7 +341,7 @@ class Window2(QDialog):
 class Window3(QDialog):
     def __init__(self):
         super().__init__()
-        uic.loadUi("window3.ui", self)
+        uic.loadUi("front/window3.ui", self)
         self.track_title = self.findChild(QTextEdit, "input_title")
         self.path_btn = self.findChild(QPushButton, "btn")
         self.buttons_box = self.findChild(QDialogButtonBox, "buttonBox")
@@ -307,6 +358,17 @@ class Window3(QDialog):
                                                    "Audio Files (*.mp3)", options=options)
         if file_name:
             self.path.setText(file_name)
+
+
+class Window4(QDialog):
+    def __init__(self):
+        """Конструктор"""
+        super().__init__()
+        uic.loadUi("front/window4.ui", self)
+        self.f_index = self.findChild(QSpinBox, "first_index")
+        self.s_index = self.findChild(QSpinBox, "second_index")
+        self.buttonBox = self.findChild(QDialogButtonBox, 'buttonBox')
+        self.buttonBox.accepted.connect(self.accept)
 
 
 if __name__ == "__main__":
