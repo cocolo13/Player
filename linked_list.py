@@ -1,21 +1,26 @@
-from back.LinkedListItem import LinkedListItem
+"""Модуль двусвязного кольцевого списка"""
+from linked_list_item import LinkedListItem
 
 
 class LinkedList:
+    """Класс двусвязного кольцевого списка"""
+
     def __init__(self, first_item=None):
+        """Конструктор"""
         self.first_item = first_item
         self.last = self.create_last()
         self.iter_value = 0
         self.value = None
 
     def create_last(self):
+        """Функция для создание ссылки на последний элемент"""
         if self.first_item is None:
             return None
-        else:
-            last = self.first_item.prev
-            return last
+        last = self.first_item.prev
+        return last
 
     def search_elem(self, elem):
+        """Функция поиска элемента elem в списке"""
         if self.first_item is None:
             return False
         current = self.first_item
@@ -26,6 +31,7 @@ class LinkedList:
         return current == elem
 
     def append_right(self, item):
+        """Функция добавления элемента item в конец списка"""
         new_node = LinkedListItem(item)
         if self.first_item is None:  # 0
             self.first_item = new_node
@@ -47,6 +53,7 @@ class LinkedList:
         self.last = new_node
 
     def append(self, item):
+        """Функция добавления элемента item в конец списка"""
         new_node = LinkedListItem(item)
         if self.first_item is None:
             self.first_item = new_node
@@ -68,6 +75,7 @@ class LinkedList:
         self.last = new_node
 
     def append_left(self, item):
+        """Функция добавления элемента item в начало списка"""
         new_node = LinkedListItem(item)
         if self.first_item is None:
             self.first_item = new_node
@@ -91,6 +99,8 @@ class LinkedList:
         self.first_item = new_node
 
     def __contains__(self, item):
+        """Переопределение метода __contains__
+        Поддержка оператора in"""
         if self.first_item is None:
             return False
         current = self.first_item
@@ -103,6 +113,8 @@ class LinkedList:
         return current.data == item
 
     def __getitem__(self, item):
+        """Переопределение метода __getitem__
+        Поддержка обращения по индексу"""
         length = self.__len__()
         if item >= 0:
             if length - 1 < item or length == 0:
@@ -123,7 +135,8 @@ class LinkedList:
         return current.data
 
     def insert(self, previous, item):
-        """Работает, только если в тесте убрать .data"""
+        """Функция добавления элемента item после
+        previous в список"""
         new_node = LinkedListItem(item)
         current = self.first_item
         while current.data != previous:
@@ -134,6 +147,8 @@ class LinkedList:
         new_node.next.prev = new_node
 
     def __str__(self):
+        """Переопределение метода __str__
+        Поддержка вывода массива в консоль"""
         string = ""
         if self.first_item is None:
             return string
@@ -145,6 +160,7 @@ class LinkedList:
         return string[:-1]
 
     def remove(self, item):
+        """Функция удаления элемента item из массива"""
         if not self.__contains__(item):
             raise ValueError
         if self.__len__() == 1:
@@ -172,6 +188,8 @@ class LinkedList:
             current.prev.next = next
 
     def __len__(self):
+        """Переопределение метода __len__
+        Поддержка функции len()"""
         if self.first_item is None:
             return 0
         current = self.first_item
@@ -182,11 +200,14 @@ class LinkedList:
         return length
 
     def __iter__(self):
+        """Переопределение метода __iter__
+        Получение итератора"""
         self.value = self.first_item
         self.iter_value = 0
         return self
 
     def __next__(self):
+        """Переопределение метода __next__"""
         if self.first_item is None:
             raise StopIteration
         if self.__len__() <= self.iter_value:
@@ -195,4 +216,3 @@ class LinkedList:
         self.value = self.value.next_item
         self.iter_value += 1
         return item
-
